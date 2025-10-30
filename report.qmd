@@ -1,6 +1,7 @@
 ---
 title: "EV Power - Lab 4 Project Report"
 format: typst
+embed-resources: true
 ---
 
 # Example Solution 1
@@ -8,22 +9,61 @@ format: typst
 ## **Part 0: libraries**
 
 ```{r}
-
+library(tidyverse)
+library(devtools)
+library(dplyr)
+library(leaflet)
+library(sf)
+library(rnaturalearth)
 ```
 
 ## **Part 1:** **Defining Research Question**
 
-Chosen Question:
+Chosen Question:  What is the overall renewable energy use in each state?
 
 ## **Part 2: Data Preparation and Cleaning**
 
 ```{r}
+renew_2021 <- read.csv("data/renew-use-2021.csv")
+renew_2022 <- read.csv("data/renew-use-2022.csv")
+renew_2023 <- read.csv("data/renew-use-2023.csv")
+total_2021 <- read.csv("data/total-use-2021.csv")
+total_2022 <- read.csv("data/total-use-2022.csv")
+total_2023 <- read.csv("data/total-use-2023.csv")
+energy_price <- read.csv("data/av-energy-price-2021-2023.csv")
+ev_registrations <- read.csv("data/ev-registrations-by-state-2023.csv")
+
+ev_registrations |> 
+    slice(-1) |>
+    slice(-1) |>
+    rename('State'='electric.vehicle.registrations_by_state..2023.') |>
+    rename('Count_EV'='X')
+
+renew_2021 <- renew_2021 |>
+    mutate(Renewable_Use_2021 = as.numeric(str_extract(Renewable_Use_2021, "[0-9]+\\.?[0-9]*")))
+
+renew_2022 <- renew_2022 |>
+    mutate(Renewable_Use_2022 = as.numeric(str_extract(Renewable_Use_2022, "[0-9]+\\.?[0-9]*")))
+
+renew_2023 <- renew_2023 |>
+    mutate(Renewable_Use_2023 = as.numeric(str_extract(Renewable_Use_2023, "[0-9]+\\.?[0-9]*")))
 
 ```
 
 ## **Part 3: Joining / Pivoting Datasets for Analysis**
 
 ```{r}
+renew_2021 <- renew_2021 |> mutate(year=2021)
+renew_2022 <- renew_2022 |> mutate(year=2022)
+renew_2023 <- renew_2023 |> mutate(year=2023)
+
+
+
+renew_by_state <- renew_2023 |>
+  group_by(State) |>
+  summarise(total_renewable = sum(Renewable_Use_2023, na.rm = TRUE))
+
+head(renew_by_state)
 
 ```
 
@@ -31,4 +71,22 @@ Chosen Question:
 
 ```{r}
 
+us_states <- ne_states(country = "united states of america", returnclass = "sf") |>
+    select(name, postal, geometry) |>
+    left_join(renew_by_state, by= c("postal"="State"))
+
+#Palette
+pal <- colorNumeric(palette = "YlGn", domain = us_states$total_renewable)
+
+
+leaflet_map <- leaflet(us_states) |>
+    addTiles() |>
+    addPolygons(fillColor = ~pal(total_renewable), fillOpacity=0.7
+    ) |>
+    addLegend(pal=pal, position = "bottomright", values=~total_renewable,title = "Renewable Energy Use (2023)", opacity=1) |>
+        setView(lng = -98,lat=39, zoom=3)
+
+# leaflet_map (leaflet map doesn't render unfortunately)
 ```
+
+Analysis: Renewable energy use was concentrated in California, with other states following slowly behind, if at all... the map uses a legend to visualize this finding... 
